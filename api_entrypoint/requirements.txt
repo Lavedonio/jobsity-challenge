@@ -1,0 +1,5 @@
+clickhouse-driver>=0.2.1,<0.3
+confluent-kafka>=1.7.0,<1.8
+Django>=3.2.4,<4.0
+djangorestframework>=3.12.4,<3.13
+psycopg2-binary>=2.8.6,<2.9
