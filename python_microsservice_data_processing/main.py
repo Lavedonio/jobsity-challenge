@@ -11,8 +11,10 @@ from confluent_kafka import Consumer, KafkaException
 from clickhouse_driver import Client
 
 
+MAX_ALLOWED_ERRORS = 0
 KAFKA_CONF = {
-    "bootstrap.servers": "localhost:9092"
+    "bootstrap.servers": "localhost:9092",
+    "group.id": "data_processing"
 }
 KAFKA_RAW_TRIPS_TOPIC = "raw_trips_data"
 
@@ -133,17 +135,18 @@ def update_metabase_postgres(data_dict: dict) -> None:
             cur.execute(postgres_insert)
 
 
-def update_django_postgres(data_dict: dict) -> None:
+def update_django_postgres(data_dict: dict, status: str = "S") -> None:
     """
         Runs the entire process to insert or update the data on
         the Metabase Postgres database.
     """
     print("Preparing SQL statement...")
     postgres_update = """
-        UPDATE kaskaskjsdfjsdf
-        SET status = 'S'
+        UPDATE public.rest_api_trip
+        SET status = '{status}'
         WHERE hash_value = '{hash_value}';
     """.format(
+        status=status,
         **data_dict
     )
 
@@ -164,24 +167,31 @@ def process(key: str, data: str) -> None:
     """
     print("-----------------------------------")
     print(f"-- Processing message key {key} --")
-    print("Creating hash from data and parsing the raw data...")
-    hash_value = create_hash_md5(data)
-    data_dict = parse_raw_data(data, hash_value)
-    print("Data parsed.")
-    print("")
+    try:
+        print("Creating hash from data and parsing the raw data...")
+        hash_value = create_hash_md5(data)
+        data_dict = parse_raw_data(data, hash_value)
+        print("Data parsed.")
+        print("")
 
-    print("Starting Metabase ClickHouse update process...")
-    update_metabase_clickhouse(data_dict)
-    print("End of Metabase ClickHouse update process.")
-    print("")
+        print("Starting Metabase ClickHouse update process...")
+        update_metabase_clickhouse(data_dict)
+        print("End of Metabase ClickHouse update process.")
+        print("")
 
-    print("Starting Metabase Postgres update process...")
-    update_metabase_postgres(data_dict)
-    print("End of Metabase Postgres update process.")
-    print("")
+        print("Starting Metabase Postgres update process...")
+        update_metabase_postgres(data_dict)
+        print("End of Metabase Postgres update process.")
+        print("")
+
+    except Exception:
+        status = "E"
+
+    else:
+        status = "S"
 
     print("Starting Django Postgres update process...")
-    update_django_postgres(data_dict)
+    update_django_postgres(data_dict, status)
     print("End of Django Postgres update process.")
     print("")
 
@@ -198,33 +208,38 @@ def main():
     """
     c = Consumer(KAFKA_CONF)
     c.subscribe([KAFKA_RAW_TRIPS_TOPIC])
-    while True:
-        try:
-            msg = c.poll(timeout=1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                raise KafkaException(msg.error())
-            else:
-                sys.stderr.write('%% %s [%d] at offset %d with key %s:\n' %
-                                 (msg.topic(), msg.partition(), msg.offset(),
-                                     str(msg.key())))
-                print(msg.value())
 
-                # Get message and start processing
-                unpacked_message = msg.value().decode('utf-8')
-                process(str(msg.key()), unpacked_message)
+    num_errors = 0
+    try:
+        while num_errors <= MAX_ALLOWED_ERRORS:
+            try:
+                msg = c.poll(timeout=1.0)
+                if msg is None:
+                    print("No message")
+                    continue
+                if msg.error():
+                    raise KafkaException(msg.error())
+                else:
+                    sys.stderr.write('%% %s [%d] at offset %d with key %s:\n' %
+                                     (msg.topic(), msg.partition(), msg.offset(),
+                                      str(msg.key())))
+                    print(msg.value())
 
-        except KeyboardInterrupt:
-            break
+                    # Get message and start processing
+                    unpacked_message = msg.value().decode('utf-8')
+                    process(str(msg.key()), unpacked_message)
 
-        except Exception as e:
-            import traceback
-            print(traceback.format_exc())
-            break
+            except KeyboardInterrupt:
+                break
 
-        finally:
-            c.close()
+            except Exception as e:
+                import traceback
+                print(traceback.format_exc())
+                num_errors += 1
+    except Exception as e:
+        raise e
+    finally:
+        c.close()
 
 
 if __name__ == "__main__":

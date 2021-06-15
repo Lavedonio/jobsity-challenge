@@ -1,0 +1,35 @@
+version: '3'
+services:
+    postgres:
+        build:
+            context: ./postgres
+        ports:
+            - 8001:5432
+        environment:
+            POSTGRES_USER: docker
+            POSTGRES_PASSWORD: my_password123
+            POSTGRES_DB: docker
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U docker"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+    clickhouse:
+        build:
+            context: ./clickhouse
+        ports:
+            - 9001:9000
+            - 8124:8123
+            - 9090:9009
+    metabase:
+        build:
+            context: ./metabase
+        ports:
+            - 3000:3000
+        volumes:
+            - metabase:/metabase.db:cached
+        depends_on:
+            postgres:
+                condition: service_healthy
+volumes:
+    metabase:

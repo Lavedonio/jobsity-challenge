@@ -1,11 +1,12 @@
 -- Basic Postgres setup
-CREATE USER docker;
-CREATE DATABASE docker;
+-- CREATE USER docker;
+-- ALTER USER docker WITH PASSWORD 'my_password123';
+-- CREATE DATABASE docker;
 GRANT ALL PRIVILEGES ON DATABASE docker TO docker;
 
 -- Project setup
 CREATE SCHEMA jobsity_challenge;
-GRANT ALL ON jobsity_challenge.* TO docker WITH GRANT OPTION;
+-- GRANT ALL ON jobsity_challenge.* TO docker WITH GRANT OPTION;
 
 DROP TABLE IF EXISTS jobsity_challenge.trips;
 

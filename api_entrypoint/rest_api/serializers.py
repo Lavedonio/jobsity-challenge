@@ -1,11 +1,9 @@
 import re
 import json
 from copy import deepcopy
-from django.conf import settings
 from rest_framework import serializers
-from confluent_kafka import Producer
 from .models import Trip
-from .aux import create_hash_md5
+from .aux import create_hash_md5, kafka_produce
 
 
 def kafka_callback(err, message):
@@ -31,17 +29,7 @@ class TripSerializer(serializers.ModelSerializer):
         kafka_value = json.dumps(kafka_data)
         kafka_key = create_hash_md5(kafka_value)
 
-        producer = Producer(settings.KAFKA_CONF)
-        producer.produce(
-            settings.KAFKA_RAW_TRIPS_TOPIC,
-            key=kafka_key,
-            value=kafka_value,
-            on_delivery=kafka_callback
-        )
-
-        print("Flushing record...")
-        producer.flush()
-        print("Done")
+        kafka_produce(kafka_key, kafka_data)
 
         validated_data['hash_value'] = kafka_key
         return super().create(validated_data)

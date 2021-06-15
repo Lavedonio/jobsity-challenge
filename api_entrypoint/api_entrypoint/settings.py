@@ -40,11 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Project Apps
-    'backoffice.apps.BackofficeConfig',
-    'base.apps.BaseConfig',
     'health.apps.HealthConfig',
     'rest_api.apps.RestApiConfig',
-    'user_area.apps.UserAreaConfig',
 
     # Third Party Apps
     'rest_framework',
@@ -86,8 +83,12 @@ WSGI_APPLICATION = 'api_entrypoint.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'docker',
+        'USER': 'docker',
+        'PASSWORD': 'my_password123',
+        'HOST': '127.0.0.1',
+        'PORT': '8001',
     }
 }
 
